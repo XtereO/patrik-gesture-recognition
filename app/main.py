@@ -1,13 +1,15 @@
 import os
 import sys
+import base64
 import logging
 
 import numpy as np
-import mediapipe as mp
 
+import cv2
+import mediapipe as mp
 from fastapi import FastAPI
 
-from .models import RecognitionBody, RecognitionReturn
+from .models import RecognitionReturn
 
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
@@ -29,12 +31,16 @@ def reduce_landmarks(items):
         acc.append([i.x, i.y, i.z])
     return acc
 
-@app.post("/recognition/")
-async def recognition(body: RecognitionBody) -> RecognitionReturn:
+@app.get("/recognition")
+async def recognition(img_base64: str):
    
+    decoded = base64.b64decode(img_base64)
+    buffer = np.fromstring(decoded, np.float32)
+    image_array = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
-        dat = np.array(body.data).astype(np.uint8)
-        res = holistic.process(dat)
+        data = np.array(image_array).astype(np.uint8)
+        res = holistic.process(data)
 
         return RecognitionReturn(right_hand = reduce_landmarks(res.right_hand_landmarks), 
                                  left_hand = reduce_landmarks(res.left_hand_landmarks),
