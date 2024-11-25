@@ -9,7 +9,8 @@ import cv2
 import mediapipe as mp
 from fastapi import FastAPI
 
-from .models import RecognitionReturn
+from .utils import add_padding, reduce_landmarks
+from .models import RecognitionReturn, RecognitionBody
 
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
@@ -22,24 +23,16 @@ mp_holistic = mp.solutions.holistic
 
 app = FastAPI()
 
-def reduce_landmarks(items):
-    if(items is None):
-        return []
-    
-    acc = []
-    for i in items.landmark:
-        acc.append([i.x, i.y, i.z])
-    return acc
-
-@app.get("/recognition")
-async def recognition(img_base64: str):
-   
-    decoded = base64.b64decode(img_base64)
+@app.post("/recognition")
+async def recognition(body: RecognitionBody):
+    img_base64 = body.base64
+    decoded = add_padding(base64.b64decode(img_base64))
     buffer = np.fromstring(decoded, np.float32)
     image_array = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
 
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
         data = np.array(image_array).astype(np.uint8)
+
         res = holistic.process(data)
 
         return RecognitionReturn(right_hand = reduce_landmarks(res.right_hand_landmarks), 
